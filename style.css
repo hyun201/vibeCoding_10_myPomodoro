@@ -624,17 +624,34 @@ body.mode-break {
   }
 
   .timer-controls {
-    gap: 10px;
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    max-width: 360px;
+  }
+
+  .btn {
+    white-space: nowrap;
+    font-size: 13.5px;
+    gap: 6px;
+  }
+
+  .btn .icon {
+    width: 17px;
+    height: 17px;
   }
 
   .btn-primary {
-    padding: 14px 28px;
-    font-size: 15px;
+    padding: 12px 20px;
+    flex: 1.2;
   }
 
   .btn-secondary {
-    padding: 12px 20px;
-    font-size: 14px;
+    padding: 12px 14px;
+    flex: 1;
   }
 
   .app-dashboard {
@@ -644,12 +661,12 @@ body.mode-break {
 
 @media (max-width: 380px) {
   .timer-display-wrapper {
-    width: 260px;
-    height: 260px;
+    width: 250px;
+    height: 250px;
   }
 
   .timer-time {
-    font-size: 40px;
+    font-size: 38px;
   }
 
   .timer-subtext {
@@ -658,8 +675,19 @@ body.mode-break {
   }
 
   .timer-controls {
-    flex-wrap: wrap;
-    justify-content: center;
+    gap: 6px;
+  }
+
+  .btn {
+    font-size: 12px;
+    padding: 10px 10px;
+    gap: 4px;
+  }
+
+  .btn .icon {
+    width: 15px;
+    height: 15px;
   }
 }
+
 

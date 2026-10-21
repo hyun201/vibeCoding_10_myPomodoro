@@ -98,29 +98,36 @@ class AudioEngine {
     }
   }
 
-  // Generate continuous Pink / Brown noise buffer for Ocean & Rain
-  createNoiseBuffer(type = 'pink') {
-    const bufferSize = 5 * this.ctx.sampleRate; // 5초 루프 버퍼
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
-    let lastOut = 0.0;
+  // Generate continuous White/Pink/Brown noise buffer for realistic ambience
+  createNoiseBuffer(type = 'white') {
+    const sampleRate = this.ctx.sampleRate;
+    const bufferSize = sampleRate * 3; // 3초 버퍼
+    const buffer = this.ctx.createBuffer(2, bufferSize, sampleRate);
+    
+    for (let channel = 0; channel < 2; channel++) {
+      const data = buffer.getChannelData(channel);
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+      let lastOut = 0.0;
 
-    for (let i = 0; i < bufferSize; i++) {
-      const white = Math.random() * 2 - 1;
-      if (type === 'pink') {
-        b0 = 0.99886 * b0 + white * 0.0555179;
-        b1 = 0.99332 * b1 + white * 0.0750759;
-        b2 = 0.96900 * b2 + white * 0.1538520;
-        b3 = 0.86650 * b3 + white * 0.3104856;
-        b4 = 0.55000 * b4 + white * 0.5329522;
-        b5 = -0.7616 * b5 - white * 0.0168980;
-        data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11;
-        b6 = white * 0.115926;
-      } else if (type === 'brown') {
-        // Brown noise for deep rolling waves
-        lastOut = (lastOut + 0.02 * white) / 1.02;
-        data[i] = lastOut * 3.5;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        if (type === 'pink') {
+          // Paul Kellet's refined pink noise filter
+          b0 = 0.99886 * b0 + white * 0.0555179;
+          b1 = 0.99332 * b1 + white * 0.0750759;
+          b2 = 0.96900 * b2 + white * 0.1538520;
+          b3 = 0.86650 * b3 + white * 0.3104856;
+          b4 = 0.55000 * b4 + white * 0.5329522;
+          b5 = -0.7616 * b5 - white * 0.0168980;
+          data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.18;
+          b6 = white * 0.115926;
+        } else if (type === 'brown') {
+          // Brown noise integration
+          lastOut = (lastOut + 0.02 * white) / 1.02;
+          data[i] = lastOut * 3.5;
+        } else {
+          data[i] = white * 0.25;
+        }
       }
     }
     return buffer;
@@ -130,6 +137,7 @@ class AudioEngine {
     this.init();
     this.stopCurrentNoise();
 
+    // Two layered noise buffers for stereo ocean surf
     const buffer = this.createNoiseBuffer('brown');
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
@@ -138,26 +146,28 @@ class AudioEngine {
     // Filter to simulate undulating rolling waves
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(320, this.ctx.currentTime);
+    filter.frequency.setValueAtTime(450, this.ctx.currentTime);
 
-    // LFO to modulate wave surge frequency
+    // LFO to modulate wave surge frequency and volume
     const lfo = this.ctx.createOscillator();
-    lfo.frequency.setValueAtTime(0.12, this.ctx.currentTime); // ~8초 파도 주기
+    lfo.type = 'sine';
+    lfo.frequency.setValueAtTime(0.15, this.ctx.currentTime); // ~6.6초 파도 주기
+    
     const lfoGain = this.ctx.createGain();
-    lfoGain.gain.setValueAtTime(250, this.ctx.currentTime);
+    lfoGain.gain.setValueAtTime(320, this.ctx.currentTime);
     lfo.connect(lfoGain);
     lfoGain.connect(filter.frequency);
     lfo.start();
 
     this.gainNode = this.ctx.createGain();
     this.gainNode.gain.setValueAtTime(0.01, this.ctx.currentTime);
-    this.gainNode.gain.linearRampToValueAtTime(0.8, this.ctx.currentTime + 1.2);
+    this.gainNode.gain.linearRampToValueAtTime(1.0, this.ctx.currentTime + 0.3);
 
     source.connect(filter);
     filter.connect(this.gainNode);
     this.gainNode.connect(this.masterGain);
 
-    source.start();
+    source.start(0);
     this.noiseNode = source;
   }
 
@@ -170,20 +180,25 @@ class AudioEngine {
     source.buffer = buffer;
     source.loop = true;
 
-    // Filter for soft pattering rain
+    // Filter for crisp yet soft rainfall
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(1000, this.ctx.currentTime);
+    filter.frequency.setValueAtTime(1400, this.ctx.currentTime);
+
+    const highpass = this.ctx.createBiquadFilter();
+    highpass.type = 'highpass';
+    highpass.frequency.setValueAtTime(250, this.ctx.currentTime);
 
     this.gainNode = this.ctx.createGain();
     this.gainNode.gain.setValueAtTime(0.01, this.ctx.currentTime);
-    this.gainNode.gain.linearRampToValueAtTime(0.65, this.ctx.currentTime + 1);
+    this.gainNode.gain.linearRampToValueAtTime(1.0, this.ctx.currentTime + 0.3);
 
     source.connect(filter);
-    filter.connect(this.gainNode);
+    filter.connect(highpass);
+    highpass.connect(this.gainNode);
     this.gainNode.connect(this.masterGain);
 
-    source.start();
+    source.start(0);
     this.noiseNode = source;
   }
 
@@ -191,52 +206,63 @@ class AudioEngine {
     this.init();
     this.stopCurrentNoise();
 
-    // Gentle outdoor background ambience
+    // Gentle outdoor forest breeze background
     const bgBuffer = this.createNoiseBuffer('pink');
     const bgSource = this.ctx.createBufferSource();
     bgSource.buffer = bgBuffer;
     bgSource.loop = true;
+    
     const bgFilter = this.ctx.createBiquadFilter();
     bgFilter.type = 'lowpass';
-    bgFilter.frequency.setValueAtTime(400, this.ctx.currentTime);
+    bgFilter.frequency.setValueAtTime(500, this.ctx.currentTime);
+    
     const bgGain = this.ctx.createGain();
-    bgGain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+    bgGain.gain.setValueAtTime(0.18, this.ctx.currentTime);
+    
     bgSource.connect(bgFilter);
     bgFilter.connect(bgGain);
     bgGain.connect(this.masterGain);
-    bgSource.start();
+    bgSource.start(0);
 
     // Function to trigger realistic bird chirps
     const chirp = () => {
       if (state.activeSound !== 'birds' || !this.ctx) return;
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
-      const startTime = this.ctx.currentTime + Math.random() * 0.2;
-      const baseFreq = 2200 + Math.random() * 800;
+      const startTime = this.ctx.currentTime + Math.random() * 0.1;
+      const baseFreq = 2400 + Math.random() * 800;
 
       osc.type = 'sine';
       osc.frequency.setValueAtTime(baseFreq, startTime);
-      osc.frequency.exponentialRampToValueAtTime(baseFreq + 700, startTime + 0.08);
-      osc.frequency.exponentialRampToValueAtTime(baseFreq - 300, startTime + 0.16);
+      osc.frequency.exponentialRampToValueAtTime(baseFreq + 800, startTime + 0.07);
+      osc.frequency.exponentialRampToValueAtTime(baseFreq - 200, startTime + 0.15);
 
       gain.gain.setValueAtTime(0.001, startTime);
-      gain.gain.linearRampToValueAtTime(0.35, startTime + 0.04);
-      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.2);
+      gain.gain.linearRampToValueAtTime(0.4, startTime + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.18);
 
       osc.connect(gain);
       gain.connect(this.masterGain);
 
       osc.start(startTime);
-      osc.stop(startTime + 0.22);
+      osc.stop(startTime + 0.2);
     };
 
+    // Immediate first chirp then repeat
     chirp();
+    setTimeout(chirp, 250);
+
     this.birdsInterval = setInterval(() => {
       chirp();
-      if (Math.random() > 0.4) {
-        setTimeout(chirp, 250);
+      if (Math.random() > 0.35) {
+        setTimeout(chirp, 220 + Math.random() * 100);
       }
-    }, 2400);
+      if (Math.random() > 0.6) {
+        setTimeout(chirp, 480 + Math.random() * 80);
+      }
+    }, 2200);
 
     this.gainNode = bgGain;
     this.noiseNode = bgSource;
