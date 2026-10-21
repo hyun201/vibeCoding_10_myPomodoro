@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FocusFlow | 포모도로 타이머</title>
+  <meta name="description" content="25분 집중과 5분 휴식으로 하루의 생산성을 극대화하는 모던 포모도로 타이머. 백색소음과 함께 깊은 몰입을 경험하세요.">
+  <!-- Google Fonts: Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;700;800&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="mode-focus">
+  <div class="ambient-glow glow-1"></div>
+  <div class="ambient-glow glow-2"></div>
+
+  <main class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo">
+        <span class="logo-icon">🍅</span>
+        <span class="logo-text">FocusFlow</span>
+      </div>
+      <div class="status-badge" id="mode-badge">
+        <span class="status-dot"></span>
+        <span id="mode-text">집중 시간 (25m)</span>
+      </div>
+    </header>
+
+    <!-- Main Timer & Circular Progress Section -->
+    <section class="timer-section">
+      <div class="timer-display-wrapper">
+        <svg class="progress-ring" viewBox="0 0 360 360" aria-hidden="true">
+          <circle class="ring-bg" cx="180" cy="180" r="150" />
+          <circle class="ring-progress" id="progress-circle" cx="180" cy="180" r="150" />
+        </svg>
+
+        <div class="timer-content">
+          <span class="session-label" id="current-phase-label">FOCUS SESSION</span>
+          <h1 class="timer-time" id="timer-display">25:00</h1>
+          <p class="timer-subtext" id="timer-status-hint">시작 버튼을 눌러 집중을 시작하세요</p>
+        </div>
+      </div>
+
+      <!-- Timer Control Buttons -->
+      <div class="timer-controls">
+        <button id="btn-start" class="btn btn-primary" title="타이머 시작">
+          <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+          <span id="start-btn-text">시작</span>
+        </button>
+
+        <button id="btn-pause" class="btn btn-secondary" title="일시정지" disabled>
+          <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+          </svg>
+          <span>일시정지</span>
+        </button>
+
+        <button id="btn-reset" class="btn btn-secondary" title="초기화">
+          <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+          </svg>
+          <span>초기화</span>
+        </button>
+      </div>
+
+      <!-- Quick Session Mode Switchers (Manual toggle if needed) -->
+      <div class="mode-toggles">
+        <button class="mode-tab active" id="tab-focus" data-mode="focus">집중 (25분)</button>
+        <button class="mode-tab" id="tab-break" data-mode="break">휴식 (5분)</button>
+      </div>
+    </section>
+
+    <!-- Bottom Dashboard: Session Counter & Ambient Sounds -->
+    <footer class="app-dashboard">
+      <!-- Session Counter Widget -->
+      <div class="card counter-card">
+        <div class="card-header">
+          <span class="card-icon">🏆</span>
+          <span class="card-title">완료한 세션</span>
+        </div>
+        <div class="counter-display">
+          <div class="counter-number-group">
+            <span class="counter-val" id="completed-count">0</span>
+            <span class="counter-unit">세션 달성</span>
+          </div>
+          <div class="session-dots" id="session-dots" aria-label="완료된 세션 시각화">
+            <!-- Dynamically generated tomato/check icons -->
+          </div>
+        </div>
+        <button class="btn-text-action" id="btn-reset-counter" title="카운터 리셋">카운트 초기화</button>
+      </div>
+
+      <!-- White Noise Mixer Widget -->
+      <div class="card sound-card">
+        <div class="card-header">
+          <div class="card-header-left">
+            <span class="card-icon">🎧</span>
+            <span class="card-title">백색소음 사운드</span>
+          </div>
+          <div class="sound-status-pill" id="sound-indicator">OFF</div>
+        </div>
+
+        <div class="noise-buttons">
+          <button class="sound-chip" data-sound="ocean" id="chip-ocean">
+            <span class="chip-icon">🌊</span>
+            <span class="chip-name">파도 소리</span>
+          </button>
+          <button class="sound-chip" data-sound="rain" id="chip-rain">
+            <span class="chip-icon">🌧️</span>
+            <span class="chip-name">빗소리</span>
+          </button>
+          <button class="sound-chip" data-sound="birds" id="chip-birds">
+            <span class="chip-icon">🐦</span>
+            <span class="chip-name">숲속 새소리</span>
+          </button>
+        </div>
+
+        <div class="volume-control-box">
+          <button class="btn-icon-mute" id="btn-mute" aria-label="음소거 토글" title="음소거 토글">
+            <svg class="icon icon-vol" id="vol-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+            </svg>
+          </button>
+          <input type="range" class="volume-slider" id="volume-slider" min="0" max="100" value="50" aria-label="볼륨 조절">
+          <span class="volume-value" id="volume-text">50%</span>
+        </div>
+      </div>
+    </footer>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
