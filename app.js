@@ -57,6 +57,7 @@ class AudioEngine {
     this.gainNode = null;
     this.masterGain = null;
     this.birdsInterval = null;
+    this.activeNodes = [];
   }
 
   init() {
@@ -83,25 +84,25 @@ class AudioEngine {
       clearInterval(this.birdsInterval);
       this.birdsInterval = null;
     }
-    if (this.gainNode && this.ctx) {
-      try {
-        this.gainNode.gain.setTargetAtTime(0, this.ctx.currentTime, 0.2);
-        setTimeout(() => {
-          if (this.noiseNode) {
-            this.noiseNode.disconnect();
-            this.noiseNode = null;
-          }
-        }, 300);
-      } catch (e) {
-        console.error(e);
-      }
+
+    if (this.activeNodes.length > 0) {
+      this.activeNodes.forEach(node => {
+        try {
+          if (typeof node.stop === 'function') node.stop();
+          node.disconnect();
+        } catch (e) {}
+      });
+      this.activeNodes = [];
     }
+
+    this.noiseNode = null;
+    this.gainNode = null;
   }
 
   // Generate continuous White/Pink/Brown noise buffer for realistic ambience
   createNoiseBuffer(type = 'white') {
     const sampleRate = this.ctx.sampleRate;
-    const bufferSize = sampleRate * 3; // 3초 버퍼
+    const bufferSize = sampleRate * 5; // 5초 대용량 루프 버퍼
     const buffer = this.ctx.createBuffer(2, bufferSize, sampleRate);
     
     for (let channel = 0; channel < 2; channel++) {
@@ -119,14 +120,14 @@ class AudioEngine {
           b3 = 0.86650 * b3 + white * 0.3104856;
           b4 = 0.55000 * b4 + white * 0.5329522;
           b5 = -0.7616 * b5 - white * 0.0168980;
-          data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.18;
+          data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.22;
           b6 = white * 0.115926;
         } else if (type === 'brown') {
           // Brown noise integration
           lastOut = (lastOut + 0.02 * white) / 1.02;
-          data[i] = lastOut * 3.5;
+          data[i] = lastOut * 3.8;
         } else {
-          data[i] = white * 0.25;
+          data[i] = white * 0.3;
         }
       }
     }
@@ -137,7 +138,6 @@ class AudioEngine {
     this.init();
     this.stopCurrentNoise();
 
-    // Two layered noise buffers for stereo ocean surf
     const buffer = this.createNoiseBuffer('brown');
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
@@ -146,29 +146,29 @@ class AudioEngine {
     // Filter to simulate undulating rolling waves
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(450, this.ctx.currentTime);
+    filter.frequency.setValueAtTime(400, this.ctx.currentTime);
 
     // LFO to modulate wave surge frequency and volume
     const lfo = this.ctx.createOscillator();
     lfo.type = 'sine';
-    lfo.frequency.setValueAtTime(0.15, this.ctx.currentTime); // ~6.6초 파도 주기
+    lfo.frequency.setValueAtTime(0.14, this.ctx.currentTime); // ~7초 파도 주기
     
     const lfoGain = this.ctx.createGain();
-    lfoGain.gain.setValueAtTime(320, this.ctx.currentTime);
+    lfoGain.gain.setValueAtTime(280, this.ctx.currentTime);
     lfo.connect(lfoGain);
     lfoGain.connect(filter.frequency);
-    lfo.start();
+    lfo.start(0);
 
-    this.gainNode = this.ctx.createGain();
-    this.gainNode.gain.setValueAtTime(0.01, this.ctx.currentTime);
-    this.gainNode.gain.linearRampToValueAtTime(1.0, this.ctx.currentTime + 0.3);
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.9, this.ctx.currentTime);
 
     source.connect(filter);
-    filter.connect(this.gainNode);
-    this.gainNode.connect(this.masterGain);
+    filter.connect(gain);
+    gain.connect(this.masterGain);
 
     source.start(0);
-    this.noiseNode = source;
+
+    this.activeNodes.push(source, filter, lfo, lfoGain, gain);
   }
 
   playRain() {
@@ -181,25 +181,25 @@ class AudioEngine {
     source.loop = true;
 
     // Filter for crisp yet soft rainfall
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(1400, this.ctx.currentTime);
+    const lowpass = this.ctx.createBiquadFilter();
+    lowpass.type = 'lowpass';
+    lowpass.frequency.setValueAtTime(1600, this.ctx.currentTime);
 
     const highpass = this.ctx.createBiquadFilter();
     highpass.type = 'highpass';
-    highpass.frequency.setValueAtTime(250, this.ctx.currentTime);
+    highpass.frequency.setValueAtTime(300, this.ctx.currentTime);
 
-    this.gainNode = this.ctx.createGain();
-    this.gainNode.gain.setValueAtTime(0.01, this.ctx.currentTime);
-    this.gainNode.gain.linearRampToValueAtTime(1.0, this.ctx.currentTime + 0.3);
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.85, this.ctx.currentTime);
 
-    source.connect(filter);
-    filter.connect(highpass);
-    highpass.connect(this.gainNode);
-    this.gainNode.connect(this.masterGain);
+    source.connect(lowpass);
+    lowpass.connect(highpass);
+    highpass.connect(gain);
+    gain.connect(this.masterGain);
 
     source.start(0);
-    this.noiseNode = source;
+
+    this.activeNodes.push(source, lowpass, highpass, gain);
   }
 
   playBirds() {
@@ -217,12 +217,14 @@ class AudioEngine {
     bgFilter.frequency.setValueAtTime(500, this.ctx.currentTime);
     
     const bgGain = this.ctx.createGain();
-    bgGain.gain.setValueAtTime(0.18, this.ctx.currentTime);
+    bgGain.gain.setValueAtTime(0.2, this.ctx.currentTime);
     
     bgSource.connect(bgFilter);
     bgFilter.connect(bgGain);
     bgGain.connect(this.masterGain);
     bgSource.start(0);
+
+    this.activeNodes.push(bgSource, bgFilter, bgGain);
 
     // Function to trigger realistic bird chirps
     const chirp = () => {
@@ -250,7 +252,6 @@ class AudioEngine {
       osc.stop(startTime + 0.2);
     };
 
-    // Immediate first chirp then repeat
     chirp();
     setTimeout(chirp, 250);
 
@@ -263,9 +264,6 @@ class AudioEngine {
         setTimeout(chirp, 480 + Math.random() * 80);
       }
     }, 2200);
-
-    this.gainNode = bgGain;
-    this.noiseNode = bgSource;
   }
 
   // Pleasant bell/chime completion alarm
